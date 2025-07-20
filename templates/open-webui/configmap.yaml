@@ -1,0 +1,12 @@
+{{- if .Values.openWebUI.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ai-homelab.fullname" . }}-open-webui-config
+  labels:
+    app.kubernetes.io/name: {{ include "ai-homelab.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: open-webui
+data:
+  WEBUI_SECRET_KEY: {{ .Values.openWebUI.environment.webuiSecretKey | quote }}
+{{- end }}

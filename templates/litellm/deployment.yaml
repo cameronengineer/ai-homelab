@@ -1,0 +1,80 @@
+{{- if .Values.litellm.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ai-homelab.fullname" . }}-litellm
+  labels:
+    app.kubernetes.io/name: {{ include "ai-homelab.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: litellm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "ai-homelab.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: litellm
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "ai-homelab.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: litellm
+    spec:
+      containers:
+        - name: litellm
+          image: "{{ .Values.litellm.image.repository }}:{{ .Values.litellm.image.tag }}"
+          imagePullPolicy: {{ .Values.litellm.image.pullPolicy }}
+          ports:
+            - name: metrics-port
+              containerPort: 9090
+              protocol: TCP
+            - name: port
+              containerPort: 4000
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: {{ include "ai-homelab.fullname" . }}-litellm-secret
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@{{ .Release.Name }}-{{ .Values.postgresql.nameOverride }}:5432/$(POSTGRES_DB)"
+            - name: STORE_MODEL_IN_DB
+              value: "true"
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+          {{- if .Values.litellm.persistence }}
+          {{- if .Values.litellm.persistence.enabled }}
+            - name: data
+              mountPath: /data
+          {{- end }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: port
+            initialDelaySeconds: {{ .Values.litellm.healthChecks.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.litellm.healthChecks.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.litellm.healthChecks.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.litellm.healthChecks.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: port
+            initialDelaySeconds: {{ .Values.litellm.healthChecks.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.litellm.healthChecks.readiness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.litellm.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "ai-homelab.fullname" . }}-litellm-config
+      {{- if .Values.litellm.persistence }}
+      {{- if .Values.litellm.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "ai-homelab.fullname" . }}-litellm-pvc
+      {{- end }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,19 @@
+{{- if .Values.litellm.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ai-homelab.fullname" . }}-litellm-config
+  labels:
+    app.kubernetes.io/name: {{ include "ai-homelab.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: litellm
+data:
+  config.yaml: |
+    # Default LiteLLM configuration
+    model_list: []
+    litellm_settings:
+      drop_params: true
+      fallbacks: [{"gpt-3.5-turbo": ["gpt-3.5-turbo-16k"]}]
+    general_settings:
+      master_key: {{ .Values.litellm.masterKey }}
+{{- end }}

@@ -1,0 +1,19 @@
+{{- if and .Values.litellm.enabled .Values.litellm.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ai-homelab.fullname" . }}-litellm-pvc
+  labels:
+    app.kubernetes.io/name: {{ include "ai-homelab.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: litellm
+spec:
+  accessModes:
+    - {{ .Values.litellm.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.litellm.persistence.size }}
+  {{- if .Values.litellm.persistence.storageClass }}
+  storageClassName: {{ .Values.litellm.persistence.storageClass }}
+  {{- end }}
+{{- end }}

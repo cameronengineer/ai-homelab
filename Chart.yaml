@@ -1,0 +1,11 @@
+apiVersion: v2
+name: ai-homelab
+description: A Helm chart for deploying multiple AI services including LiteLLM, n8n, and Qdrant
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  - name: postgresql
+    version: 12.5.8
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled

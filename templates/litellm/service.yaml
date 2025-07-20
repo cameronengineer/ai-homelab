@@ -1,0 +1,25 @@
+{{- if .Values.litellm.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ai-homelab.fullname" . }}-litellm
+  labels:
+    app.kubernetes.io/name: {{ include "ai-homelab.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: litellm
+spec:
+  type: {{ .Values.litellm.service.type }}
+  ports:
+    - port: {{ .Values.litellm.service.metricsPort }}
+      targetPort: metrics-port
+      protocol: TCP
+      name: metrics-port
+    - port: {{ .Values.litellm.service.port }}
+      targetPort: port
+      protocol: TCP
+      name: port
+  selector:
+    app.kubernetes.io/name: {{ include "ai-homelab.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: litellm
+{{- end }}

@@ -1,0 +1,227 @@
+{{- if .Values.ollama.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ai-homelab.fullname" . }}-ollama-scripts
+  labels:
+    app.kubernetes.io/name: {{ include "ai-homelab.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: ollama
+data:
+  manage_models.sh: |
+    #!/bin/bash
+    
+    # Script to synchronize Ollama models with a predefined list from environment variable
+    # Usage: OLLAMA_MODELS="model1,model2,model3" ./manage_models.sh
+    
+    set -euo pipefail
+    
+    # Color codes for output
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m' # No Color
+    
+    # Logging function
+    log() {
+        echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1"
+    }
+    
+    error() {
+        echo -e "${RED}[ERROR]${NC} $1" >&2
+    }
+    
+    warning() {
+        echo -e "${YELLOW}[WARNING]${NC} $1"
+    }
+    
+    success() {
+        echo -e "${GREEN}[SUCCESS]${NC} $1"
+    }
+    
+    # Check if ollama is installed and accessible
+    check_ollama() {
+        if ! command -v ollama &> /dev/null; then
+            error "Ollama is not installed or not in PATH"
+            exit 1
+        fi
+        
+        # Check if ollama service is running
+        if ! ollama list &> /dev/null; then
+            error "Ollama service is not running. Please start it with: ollama serve"
+            exit 1
+        fi
+    }
+    
+    # Parse the OLLAMA_MODELS environment variable
+    parse_model_list() {
+        local models_var="${OLLAMA_MODELS:-}"
+        
+        if [[ -z "$models_var" ]]; then
+            log "OLLAMA_MODELS environment variable is not set or empty - skipping model sync"
+            exit 0
+        fi
+        
+        # Convert comma-separated list to array, trim spaces
+        IFS=',' read -ra DESIRED_MODELS <<< "$models_var"
+        for i in "${!DESIRED_MODELS[@]}"; do
+            DESIRED_MODELS[$i]=$(echo "${DESIRED_MODELS[$i]}" | xargs)
+        done
+        
+        log "Desired models: ${DESIRED_MODELS[*]}"
+    }
+    
+    # Get currently installed models
+    get_installed_models() {
+        log "Fetching currently installed models..."
+        
+        # Get list of installed models, extract just the model names
+        INSTALLED_MODELS=()
+        while IFS= read -r line; do
+            # Skip header line and empty lines
+            if [[ "$line" =~ ^[[:space:]]*NAME[[:space:]]+ID[[:space:]]+SIZE[[:space:]]+MODIFIED ]] || [[ -z "$line" ]]; then
+                continue
+            fi
+            
+            # Extract model name (first column)
+            model_name=$(echo "$line" | awk '{print $1}')
+            if [[ -n "$model_name" ]]; then
+                INSTALLED_MODELS+=("$model_name")
+            fi
+        done < <(ollama list 2>/dev/null || true)
+        
+        log "Currently installed models: ${INSTALLED_MODELS[*]:-none}"
+    }
+    
+    # Find models to remove (installed but not in desired list)
+    find_models_to_remove() {
+        MODELS_TO_REMOVE=()
+        
+        for installed in "${INSTALLED_MODELS[@]}"; do
+            local should_remove=true
+            for desired in "${DESIRED_MODELS[@]}"; do
+                if [[ "$installed" == "$desired" ]]; then
+                    should_remove=false
+                    break
+                fi
+            done
+            
+            if [[ "$should_remove" == true ]]; then
+                MODELS_TO_REMOVE+=("$installed")
+            fi
+        done
+        
+        if [[ ${#MODELS_TO_REMOVE[@]} -gt 0 ]]; then
+            log "Models to remove: ${MODELS_TO_REMOVE[*]}"
+        else
+            log "No models need to be removed"
+        fi
+    }
+    
+    # Find models to install (in desired list but not installed)
+    find_models_to_install() {
+        MODELS_TO_INSTALL=()
+        
+        for desired in "${DESIRED_MODELS[@]}"; do
+            local should_install=true
+            for installed in "${INSTALLED_MODELS[@]}"; do
+                if [[ "$installed" == "$desired" ]]; then
+                    should_install=false
+                    break
+                fi
+            done
+            
+            if [[ "$should_install" == true ]]; then
+                MODELS_TO_INSTALL+=("$desired")
+            fi
+        done
+        
+        if [[ ${#MODELS_TO_INSTALL[@]} -gt 0 ]]; then
+            log "Models to install: ${MODELS_TO_INSTALL[*]}"
+        else
+            log "No models need to be installed"
+        fi
+    }
+    
+    # Remove models that are not in the desired list
+    remove_unwanted_models() {
+        if [[ ${#MODELS_TO_REMOVE[@]} -eq 0 ]]; then
+            return
+        fi
+        
+        log "Removing unwanted models..."
+        
+        for model in "${MODELS_TO_REMOVE[@]}"; do
+            log "Removing model: $model"
+            if ollama rm "$model"; then
+                success "Successfully removed: $model"
+            else
+                warning "Failed to remove: $model"
+            fi
+        done
+    }
+    
+    # Install missing models with retry mechanism
+    install_missing_models() {
+        if [[ ${#MODELS_TO_INSTALL[@]} -eq 0 ]]; then
+            return
+        fi
+        
+        log "Installing missing models..."
+        
+        for model in "${MODELS_TO_INSTALL[@]}"; do
+            log "Installing model: $model"
+            
+            # Continuous retry mechanism - restart pull every 30 seconds to bypass slowdown bug
+            while true; do
+                timeout 30s ollama pull "$model" && break
+            done
+            
+            success "Successfully installed: $model"
+        done
+    }
+    
+    # Main execution
+    main() {
+        log "Starting Ollama model synchronization..."
+        
+        check_ollama
+        parse_model_list
+        get_installed_models
+        
+        find_models_to_remove
+        find_models_to_install
+        
+        # Show summary before making changes
+        echo
+        log "=== SUMMARY ==="
+        log "Models to remove: ${#MODELS_TO_REMOVE[@]}"
+        log "Models to install: ${#MODELS_TO_INSTALL[@]}"
+        
+        # Skip confirmation in non-interactive environments
+        if [[ -t 0 ]] && [[ ${#MODELS_TO_REMOVE[@]} -gt 0 || ${#MODELS_TO_INSTALL[@]} -gt 0 ]]; then
+            echo
+            read -p "Proceed with changes? (y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                log "Operation cancelled by user"
+                exit 0
+            fi
+        fi
+        
+        # Execute changes
+        remove_unwanted_models
+        install_missing_models
+        
+        log "Model synchronization completed!"
+        
+        # Show final state
+        echo
+        log "=== FINAL STATE ==="
+        get_installed_models
+    }
+    
+    # Execute main function
+    main "$@"
+{{- end }}

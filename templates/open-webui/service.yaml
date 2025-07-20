@@ -1,0 +1,21 @@
+{{- if .Values.openWebUI.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ai-homelab.fullname" . }}-open-webui
+  labels:
+    app.kubernetes.io/name: {{ include "ai-homelab.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: open-webui
+spec:
+  type: {{ .Values.openWebUI.service.type }}
+  ports:
+    - port: {{ .Values.openWebUI.service.port }}
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ include "ai-homelab.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: open-webui
+{{- end }}
