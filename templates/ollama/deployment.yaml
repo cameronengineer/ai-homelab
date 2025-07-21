@@ -22,45 +22,42 @@ spec:
         app.kubernetes.io/component: ollama
     spec:
       initContainers:
-        - name: model-sync
+        - name: ollama-init
           image: "{{ .Values.ollama.image.repository }}:{{ .Values.ollama.image.tag }}"
           imagePullPolicy: {{ .Values.ollama.image.pullPolicy }}
-          command: ["/bin/bash", "-c", "ollama serve & sleep 10 && /scripts/manage_models.sh"]
+          command:
+            - /bin/bash
+            - /scripts/manage_models.sh
           env:
-            - name: OLLAMA_MODELS
+            - name: OLLAMA_MODELS_LIST
               value: "{{ join "," .Values.ollama.models }}"
           volumeMounts:
-          {{- if .Values.ollama.persistence }}
-          {{- if .Values.ollama.persistence.enabled }}
             - name: data
               mountPath: /root/.ollama
-          {{- end }}
-          {{- end }}
             - name: scripts
               mountPath: /scripts
-              readOnly: true
           resources:
-            limits:
-              cpu: 1000m
-              memory: 1Gi
-            requests:
-              cpu: 500m
-              memory: 512Mi
+            {{- toYaml .Values.ollama.resources | nindent 12 }}
       containers:
         - name: ollama
           image: "{{ .Values.ollama.image.repository }}:{{ .Values.ollama.image.tag }}"
           imagePullPolicy: {{ .Values.ollama.image.pullPolicy }}
+          command: 
+            - /bin/sh
+            - -c
+            - "ollama serve"
+          env:
+            - name: OLLAMA_MODELS_LIST
+              value: "{{ join "," .Values.ollama.models }}"
           ports:
             - name: http
               containerPort: 11434
               protocol: TCP
-          {{- if .Values.ollama.persistence }}
-          {{- if .Values.ollama.persistence.enabled }}
           volumeMounts:
             - name: data
               mountPath: /root/.ollama
-          {{- end }}
-          {{- end }}
+            - name: scripts
+              mountPath: /scripts
           livenessProbe:
             httpGet:
               path: /
@@ -84,11 +81,7 @@ spec:
           configMap:
             name: {{ include "ai-homelab.fullname" . }}-ollama-scripts
             defaultMode: 0755
-      {{- if .Values.ollama.persistence }}
-      {{- if .Values.ollama.persistence.enabled }}
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "ai-homelab.fullname" . }}-ollama-pvc
-      {{- end }}
-      {{- end }}
 {{- end }}
