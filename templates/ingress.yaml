@@ -1,0 +1,37 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "ai-homelab.fullname" . }}-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.ingressClassName }}
+  rules:
+  - host: {{ .Values.ingress.host }}
+    http:
+      paths:
+      - path: /ollama
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "ai-homelab.fullname" . }}-ollama
+            port:
+              number: {{ .Values.ollama.service.port }}
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "ai-homelab.fullname" . }}-open-webui
+            port:
+              number: {{ .Values.openWebUI.service.port }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tlsSecret }}
+  {{- end }}
+{{- end }}

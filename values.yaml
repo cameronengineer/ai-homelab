@@ -128,3 +128,13 @@ ollama:
       failureThreshold: 3
   models:
     - llama3.2:1b
+    - deepseek-r1:1.5b
+
+# Ingress configuration
+ingress:
+  enabled: true
+  host: ai-homelab.local
+  ingressClassName: nginx
+  annotations: {}
+  tls: false
+  tlsSecret: ai-homelab-tls

@@ -1,55 +1,153 @@
-# AI Homelab Shenanigans
+# AI Homelab Helm Chart
 
-Welcome to your personal AI playground! This project is designed for tinkering, experimenting, and generally messing around with Large Language Models (LLMs) in a self-hosted homelab environment. Think of it as your digital sandbox for AI exploration.
+Deploy your personal AI playground to Kubernetes! This Helm chart bundles popular open-source AI tools for easy homelab deployment.
 
-## What's Inside?
+## Features
 
-This setup primarily focuses on getting **Ollama** up and running smoothly, allowing you to easily manage and deploy various LLM models.
+- **Ollama**: Run and manage large language models (LLMs) locally
+- **Open WebUI**: User-friendly web interface for interacting with LLMs
+- **LiteLLM**: Unified API gateway for multiple LLM providers (experimental)
+- **PostgreSQL**: Optional database backend for LiteLLM
+- **Automated Model Management**: Pre-load Ollama models during deployment
+- **Persistent Storage**: PVCs for model data and application state
 
-*   **Ollama Deployment**: Ollama has been deployed to your Kubernetes cluster via Helm, ensuring a stable and manageable setup.
-*   **Automated Model Synchronization**: The system automatically handles the synchronization of desired LLM models, including resilient downloads that restart stalled processes every 30 seconds to ensure completion.
-*   **Open WebUI**: An optional component for a user-friendly web interface to interact with your deployed LLMs.
+## Components
 
-## Getting Started
+### Ollama
+- Runs LLMs locally on your Kubernetes cluster
+- Automatically downloads specified models during deployment
+- Persistent storage for downloaded models
+- Health checks ensure service availability
 
-This project is designed to be deployed using Helm. Ensure you have Helm and kubectl configured for your Kubernetes cluster.
+### Open WebUI
+- Modern web interface for interacting with Ollama
+- Connects directly to Ollama service
+- Optional persistent storage for user data
+- Configurable resource limits
 
-### Prerequisites
+### LiteLLM (Experimental)
+- Unified API gateway for multiple LLM providers
+- Master key authentication
+- Optional PostgreSQL backend for persistence
+- Metrics endpoint for monitoring
 
-*   **Kubernetes Cluster**: A running Kubernetes cluster.
-*   **Helm**: Installed and configured.
+## Prerequisites
 
-### Deployment
+- Kubernetes cluster (v1.19+)
+- Helm (v3+)
+- kubectl configured for your cluster
+- StorageClass configured for persistent volumes (if using persistence)
 
-1.  **Clone the Repository**:
-    ```bash
-    git clone <your-repo-url>
-    cd ai-homelab
-    ```
+## Installation
 
-2.  **Configure Models**:
-    Edit the `values.yaml` file to specify which Ollama models you want to have available. The `OLLAMA_MODELS` environment variable will be populated from this list.
+1. Clone the repository:
+```bash
+git clone https://github.com/your-repo/ai-homelab.git
+cd ai-homelab
+```
 
-    Example `values.yaml` snippet:
-    ```yaml
-    ollama:
-      enabled: true
-      models:
-        - "llama2:7b"
-        - "mistral:7b"
-        # Add more models here as needed
-    ```
+2. Configure your deployment in `values.yaml`:
+```yaml
+# Enable components
+ollama:
+  enabled: true
+  models:
+    - "llama3:8b"
+    - "mistral:7b"
 
-3.  **Deploy with Helm**:
-    Upgrade or install the Helm chart:
-    ```bash
-    helm upgrade --install ai-stack . --namespace default --reuse-values
-    ```
+openWebUI:
+  enabled: true
+
+litellm:
+  enabled: false  # Experimental
+```
+
+3. Deploy the chart:
+```bash
+helm upgrade --install ai-stack . --namespace ai --create-namespace
+```
+
+## Configuration
+
+### values.yaml Overview
+```yaml
+# Global settings
+globalConfig:
+  imagePullPolicy: IfNotPresent
+
+# Ollama configuration
+ollama:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ollama/ollama
+    tag: latest
+  persistence:
+    enabled: true
+    size: 10Gi
+  models:
+    - "llama3:8b"
+
+# Open WebUI configuration
+openWebUI:
+  enabled: true
+  image:
+    repository: ghcr.io/open-webui/open-webui
+    tag: main
+  persistence:
+    enabled: true
+    size: 5Gi
+
+# LiteLLM configuration (experimental)
+litellm:
+  enabled: false
+  masterKey: "your-secret-key-here"
+
+# PostgreSQL configuration (required for LiteLLM)
+postgresql:
+  enabled: false
+  auth:
+    postgresPassword: "dbpassword"
+```
+
+## Accessing Services
+
+| Service    | Port  | Access Method                 |
+|------------|-------|-------------------------------|
+| Ollama     | 11434 | `http://<service-name>:11434` |
+| Open WebUI | 8080  | `http://<service-name>:8080`  |
+| LiteLLM    | 4000  | `http://<service-name>:4000`  |
+
+## Persistence
+
+All components support persistent storage via PersistentVolumeClaims:
+- Ollama: Stores downloaded models (10Gi by default)
+- Open WebUI: Stores user data and settings (5Gi by default)
+- PostgreSQL: Stores LiteLLM data (8Gi by default)
+
+Disable persistence by setting `component.persistence.enabled: false`
+
+## Health Monitoring
+
+Each component includes configurable health checks:
+- Liveness probes restart unhealthy containers
+- Readiness probes manage traffic routing
+- Customize timing in `values.yaml`
+
+## Uninstallation
+
+```bash
+helm uninstall ai-stack --namespace ai
+kubectl delete pvc -l app.kubernetes.io/instance=ai-stack -n ai
+```
 
 ## Contributing
 
-If you have ideas for new features, improvements, or want to add support for other AI tools, feel free to open an issue or a pull request. Just remember, keep it fun and experimental!
+Contributions welcome! Please follow these guidelines:
+1. Open an issue to discuss proposed changes
+2. Fork the repository and create a feature branch
+3. Submit a pull request with clear documentation
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) for details.
