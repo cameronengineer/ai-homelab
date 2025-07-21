@@ -103,6 +103,14 @@ ollama:
   service:
     type: ClusterIP
     port: 11434
+    # DNS name configuration for service discovery
+    dns:
+      # Use full DNS name with namespace and cluster domain
+      useFQDN: false
+      # Custom namespace (defaults to .Release.Namespace)
+      namespace: ""
+      # Custom cluster domain (defaults to cluster.local)
+      clusterDomain: "cluster.local"
   resources:
     limits:
       cpu: 2000m

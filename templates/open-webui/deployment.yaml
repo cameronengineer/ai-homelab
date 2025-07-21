@@ -34,7 +34,7 @@ spec:
                 name: {{ include "ai-homelab.fullname" . }}-open-webui-config
           env:
             - name: OLLAMA_BASE_URL
-              value: "http://{{ .Release.Name }}-{{ include "ai-homelab.name" . }}-ollama:{{ .Values.ollama.service.port }}"
+              value: "http://{{ include "ai-homelab.ollamaServiceDNS" . }}:{{ .Values.ollama.service.port }}"
           livenessProbe:
             httpGet:
               path: /health

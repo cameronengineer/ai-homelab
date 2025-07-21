@@ -84,3 +84,17 @@ Create service account name for a specific service
 {{- define "ai-homelab.serviceAccountName" -}}
 {{- printf "%s-%s" (include "ai-homelab.fullname" .) .serviceName | trunc 63 | trimSuffix "-" }}
 {{- end }}
+
+{{/*
+Create Ollama service DNS name with fallback handling
+*/}}
+{{- define "ai-homelab.ollamaServiceDNS" -}}
+{{- $serviceName := printf "%s-ollama" (include "ai-homelab.fullname" .) -}}
+{{- if .Values.ollama.service.dns.useFQDN -}}
+{{- $namespace := default .Release.Namespace .Values.ollama.service.dns.namespace -}}
+{{- $clusterDomain := default "cluster.local" .Values.ollama.service.dns.clusterDomain -}}
+{{- printf "%s.%s.svc.%s" $serviceName $namespace $clusterDomain -}}
+{{- else -}}
+{{- $serviceName -}}
+{{- end -}}
+{{- end }}
